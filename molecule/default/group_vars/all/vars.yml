@@ -1,8 +1,3 @@
 ---
 
-thanos_services:
-  query:
-    enabled: true
-    state: stopped
-
 ...
