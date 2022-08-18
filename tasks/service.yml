@@ -1,0 +1,10 @@
+---
+
+- name: ensure thanos is enabled on boot
+  become: true
+  service:
+    name: thanos
+    enabled: true
+    state: started
+
+...

@@ -1,0 +1,130 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+# {{ ansible_managed }}
+
+# GOMAXPROCS={{ ansible_processor_vcpus | default(ansible_processor_count) }}
+
+OPTIONS="
+{% if thanos_sidecar is defined %}
+  {# log configuration #}
+  --log.level={{ thanos_sidecar.log.level | default('info') }} \
+  {% if thanos_sidecar.log.format is defined and
+        thanos_sidecar.log.format in ["logfmt", "json"] %}
+  --log.format={{ thanos_sidecar.log.format }} \
+  {% endif %}
+  {# HTTP Endpoint #}
+  --http-address {{ thanos_sidecar.http.listen_address }}:{{ thanos_sidecar.http.listen_port }} \
+  {% if thanos_sidecar.http.grace_period is defined %}
+  --http-grace-period={{ thanos_sidecar.http.grace_period }} \
+  {% endif %}
+  {# gRPC endpoint #}
+  --grpc-address {{ thanos_sidecar.grpc.listen_address }}:{{ thanos_sidecar.grpc.listen_port }} \
+  {% if thanos_sidecar.grpc.grace_period is defined and
+        thanos_sidecar.grpc.grace_period | string | length > 0 %}
+  --grpc-grace-period={{ thanos_sidecar.grpc.grace_period }} \
+  {% endif %}
+  {% if thanos_sidecar.grpc.tls is defined and
+        thanos_sidecar.grpc.tls | default({}) | count > 0 %}
+    {% if thanos_sidecar.grpc.tls.cert is defined and
+          thanos_sidecar.grpc.tls.cert | string | length > 0 and
+          thanos_sidecar.grpc.tls.client_ca is defined and
+          thanos_sidecar.grpc.tls.client_ca | string | length > 0 and
+          thanos_sidecar.grpc.tls.key is defined
+          thanos_sidecar.grpc.tls.key | string | length > 0 %}
+  --grpc-server-tls-cert="{{ thanos_sidecar.grpc.tls.cert }}" \
+  --grpc-server-tls-client-ca="{{ thanos_sidecar.grpc.tls.client_ca }}" \
+  --grpc-server-tls-key="{{ thanos_sidecar.grpc.tls.key }}" \
+    {% endif %}
+  {% endif %}
+  {# #}
+  --objstore.config-file {{ thanos_sidecar.objstore.config_file }} \
+  {# #}
+  --prometheus.url {{ thanos_sidecar.prometheus.url }}
+  {% if thanos_sidecar.prometheus.ready_timeout is defined and
+        thanos_sidecar.prometheus.ready_timeout | string | length > 0 %}
+  --prometheus.ready_timeout={{ thanos_sidecar.prometheus.ready_timeout }} \
+  {% endif %}
+  {% if thanos_sidecar.reloader is defined and
+        thanos_sidecar.reloader | default({}) | count > 0 %}
+    {% if thanos_sidecar.reloader.config_envsubst_file is defined and
+          thanos_sidecar.reloader.config_envsubst_file | string | length > 0 %}
+  --reloader.config-envsubst-file="{{ thanos_sidecar.reloader.config_envsubst_file }}"  \
+    {% endif %}
+    {% if thanos_sidecar.reloader.config_file is defined and
+          thanos_sidecar.reloader.config_file | string | length > 0 %}
+  --reloader.config-file="{{ thanos_sidecar.reloader.config_file }}" \
+    {% endif %}
+    {% if thanos_sidecar.reloader.retry_interval is defined and
+          thanos_sidecar.reloader.retry_interval | string | length > 0 %}
+  --reloader.retry-interval={{ thanos_sidecar.reloader.retry_interval }} \
+    {% endif %}
+    {% if thanos_sidecar.reloader.rule_dir is defined and
+          thanos_sidecar.reloader.rule_dir | string | length > 0 %}
+  --reloader.rule-dir={{ thanos_sidecar.reloader.rule_dir }} \
+    {% endif %}
+    {% if thanos_sidecar.reloader.watch_interval is defined and
+          thanos_sidecar.reloader.watch_interval | string | length > 0 %}
+  --reloader.watch-interval={{ thanos_sidecar.reloader.watch_interval }} \
+    {% endif %}
+  {% endif %}
+  {# #}
+  --tsdb.path {{ thanos_sidecar.tsdb.path }} \
+{% endif %}
+"
+
+{#
+      --grpc-address="0.0.0.0:10901"
+                                 Listen ip:port address for gRPC endpoints (StoreAPI). Make sure this address is routable from other components.
+      --grpc-grace-period=2m     Time to wait after an interrupt received for GRPC Server.
+      --grpc-server-tls-cert=""  TLS Certificate for gRPC server, leave blank to disable TLS
+      --grpc-server-tls-client-ca=""
+                                 TLS CA to verify clients against. If no client CA is specified, there is no client verification on server side. (tls.NoClientCert)
+      --grpc-server-tls-key=""   TLS Key for the gRPC server, leave blank to disable TLS
+      --hash-func=               Specify which hash function to use when calculating the hashes of produced files. If no function has been specified, it does not happen. This permits avoiding
+                                 downloading some files twice albeit at some performance cost. Possible values are: "", "SHA256".
+  -h, --help                     Show context-sensitive help (also try --help-long and --help-man).
+      --http-address="0.0.0.0:10902"
+                                 Listen host:port for HTTP endpoints.
+      --http-grace-period=2m     Time to wait after an interrupt received for HTTP Server.
+      --http.config=""           [EXPERIMENTAL] Path to the configuration file that can enable TLS or authentication for all HTTP endpoints.
+      --log.format=logfmt        Log format to use. Possible options: logfmt or json.
+      --log.level=info           Log filtering level.
+      --min-time=0000-01-01T00:00:00Z
+                                 Start of time range limit to serve. Thanos sidecar will serve only metrics, which happened later than this value. Option can be a constant time in RFC3339 format
+                                 or time duration relative to current time, such as -1d or 2h45m. Valid duration units are ms, s, m, h, d, w, y.
+      --objstore.config=<content>
+                                 Alternative to 'objstore.config-file' flag (mutually exclusive). Content of YAML file that contains object store configuration. See format details:
+                                 https://thanos.io/tip/thanos/storage.md/#configuration
+      --objstore.config-file=<file-path>
+                                 Path to YAML file that contains object store configuration. See format details: https://thanos.io/tip/thanos/storage.md/#configuration
+      --prometheus.http-client=<content>
+                                 Alternative to 'prometheus.http-client-file' flag (mutually exclusive). Content of YAML file or string with http client configs. see Format details : ...
+      --prometheus.http-client-file=<file-path>
+                                 Path to YAML file or string with http client configs. see Format details : ...
+      --prometheus.ready_timeout=10m
+                                 Maximum time to wait for the Prometheus instance to start up
+      --prometheus.url=http://localhost:9090
+                                 URL at which to reach Prometheus's API. For better performance use local network.
+      --reloader.config-envsubst-file=""
+                                 Output file for environment variable substituted config file.
+      --reloader.config-file=""  Config file watched by the reloader.
+      --reloader.retry-interval=5s
+                                 Controls how often reloader retries config reload in case of error.
+      --reloader.rule-dir=RELOADER.RULE-DIR ...
+                                 Rule directories for the reloader to refresh (repeated field).
+      --reloader.watch-interval=3m
+                                 Controls how often reloader re-reads config and rules.
+      --request.logging-config=<content>
+                                 Alternative to 'request.logging-config-file' flag (mutually exclusive). Content of YAML file with request logging configuration. See format details:
+                                 https://thanos.io/tip/thanos/logging.md/#configuration
+      --request.logging-config-file=<file-path>
+                                 Path to YAML file with request logging configuration. See format details: https://thanos.io/tip/thanos/logging.md/#configuration
+      --shipper.upload-compacted
+                                 If true shipper will try to upload compacted blocks as well. Useful for migration purposes. Works only if compaction is disabled on Prometheus. Do it once and
+                                 then disable the flag when done.
+      --tracing.config=<content>
+                                 Alternative to 'tracing.config-file' flag (mutually exclusive). Content of YAML file with tracing configuration. See format details:
+                                 https://thanos.io/tip/thanos/tracing.md/#configuration
+      --tracing.config-file=<file-path>
+                                 Path to YAML file with tracing configuration. See format details: https://thanos.io/tip/thanos/tracing.md/#configuration
+      --tsdb.path="./data"       Data directory of TSDB.
+#}

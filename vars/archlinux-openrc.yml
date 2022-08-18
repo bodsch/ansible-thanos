@@ -1,0 +1,6 @@
+---
+
+thanos_requirements:
+  - iproute
+
+...

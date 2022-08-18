@@ -1,0 +1,221 @@
+---
+
+- name: include OS specific configuration ({{ ansible_distribution }} ({{ ansible_os_family }}) {{ ansible_distribution_major_version }})
+  include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      paths:
+        - "vars"
+      files:
+        # eg. debian-10 / ubuntu-20.04 / centos-8 / oraclelinux-8
+        - "{{ ansible_distribution | lower }}-{{ ansible_distribution_major_version }}.yml"
+        # eg. archlinux-systemd / archlinux-openrc
+        - "{{ ansible_distribution | lower }}-{{ ansible_service_mgr | lower }}.yml"
+        # eg. debian / ubuntu / centos / oraclelinux
+        - "{{ ansible_distribution | lower }}.yml"
+        # eg. redhat / debian / archlinux
+        - "{{ ansible_os_family | lower }}.yml"
+        - default.yaml
+      skip: true
+
+- name: update package cache
+  package:
+    update_cache: true
+
+- name: define delegate instance for download handling
+  set_fact:
+    thanos_delegate_to: "{{ ansible_host }}"
+    thanos_local_tmp_directory: "{{
+        lookup('env', 'CUSTOM_LOCAL_TMP_DIRECTORY') |
+        default('/var/cache/ansible/thanos', true) }}/{{ thanos_version }}"
+  when:
+    - thanos_direct_download
+
+- name: install dependency
+  package:
+    name: "{{ thanos_requirements }}"
+    state: present
+
+- block:
+    - name: get latest release
+      uri:
+        url: "https://api.github.com/repos/thanos-io/thanos/releases/latest"
+        method: GET
+        return_content: true
+        status_code: 200
+        body_format: json
+        validate_certs: false
+        user: "{{ lookup('env', 'GH_USER') | default(omit) }}"
+        password: "{{ lookup('env', 'GH_TOKEN') | default(omit) }}"
+      # no_log: "{{ not lookup('env', 'ANSIBLE_DEBUG') | bool }}"
+      register: _latest_release
+      until: _latest_release.status == 200
+      retries: 5
+
+    - name: set thanos version to {{ _latest_release.json.tag_name[1:] }}
+      set_fact:
+        thanos_version: "{{ _latest_release.json.tag_name[1:] }}"
+  when:
+    - thanos_version == "latest"
+
+- name: detect our installation path '{{ thanos_install_path | dirname }}'
+  stat:
+    path: "{{ thanos_install_path | dirname }}"
+    get_checksum: false
+  register: stat_thanos_path
+  ignore_errors: true
+
+- name: old installation
+  block:
+    - name: stop old service
+      service:
+        name: thanos
+        state: stopped
+        enabled: false
+      notify:
+        - daemon-reload
+
+    - name: remove installed systemd unit
+      file:
+        state: absent
+        path: /etc/systemd/system/thanos.service
+      when:
+        - ansible_service_mgr | lower == "systemd"
+
+    - name: remove installed thanos
+      file:
+        state: absent
+        path: "{{ stat_thanos_path.stat.path }}"
+  when:
+    - stat_thanos_path is defined
+    - stat_thanos_path.stat is defined
+    - stat_thanos_path.stat.isdir is defined
+    - not stat_thanos_path.stat.isdir
+
+- name: flush handlers
+  meta: flush_handlers
+
+- name: detect installed thanos binary
+  stat:
+    path: "{{ thanos_install_path }}/thanos"
+  register: stat_thanos_binary
+
+- name: create download directory
+  become: false
+  delegate_to: "{{ thanos_delegate_to }}"
+  file:
+    path: "{{ thanos_local_tmp_directory }}"
+    state: directory
+    mode: 0750
+
+- name: user and group handling
+  block:
+    - name: create thanos group
+      group:
+        name: "{{ thanos_system_group }}"
+        state: present
+        system: true
+
+    - name: create thanos user
+      user:
+        name: "{{ thanos_system_user }}"
+        groups: "{{ thanos_system_group }}"
+        append: true
+        shell: /usr/sbin/nologin
+        system: true
+        createhome: false
+        home: /nonexistent
+  when:
+    - thanos_system_user != "root"
+
+- name: create install directory
+  file:
+    path: "{{ thanos_install_path }}"
+    state: directory
+    owner: "{{ thanos_system_user }}"
+    group: "{{ thanos_system_group }}"
+    mode: 0755
+
+- name: fix directory rights for {{ thanos_install_path | dirname }}
+  file:
+    path: "{{ thanos_install_path | dirname }}"
+    state: directory
+    owner: "{{ thanos_system_user }}"
+    group: "{{ thanos_system_group }}"
+    mode: 0755
+    recurse: true
+
+- name: create ansible local facts directory
+  file:
+    dest: /etc/ansible/facts.d
+    state: directory
+    owner: root
+    group: root
+    mode: 0775
+
+- name: merge thanos configuration between defaults and custom
+  set_fact:
+    thanos_services: "{{ thanos_defaults_services | combine( thanos_services, recursive=True) }}"
+    thanos_sidecar: "{{ thanos_defaults_sidecar | combine( thanos_sidecar, recursive=True) }}"
+    thanos_query: "{{ thanos_defaults_query | combine( thanos_query, recursive=True) }}"
+    thanos_query_frontend: "{{ thanos_defaults_query_frontend | combine( thanos_query_frontend, recursive=True) }}"
+    thanos_store: "{{ thanos_defaults_store | combine( thanos_store, recursive=True) }}"
+    thanos_compact: "{{ thanos_defaults_compact | combine( thanos_compact, recursive=True) }}"
+    thanos_rule: "{{ thanos_defaults_rule | combine( thanos_rule, recursive=True) }}"
+    thanos_receive: "{{ thanos_defaults_receive | combine( thanos_receive, recursive=True) }}"
+
+# - name: merge thanos global configuration between defaults and custom
+#   set_fact:
+#     thanos_global: "{{ thanos_defaults_global |
+#       combine( thanos_global, recursive=True) }}"
+#
+# - name: merge thanos alerting configuration between defaults and custom
+#   set_fact:
+#     thanos_alerting: "{{ thanos_defaults_alerting |
+#       combine( thanos_alerting, recursive=True ) }}"
+#
+# - name: merge thanos remote_write configuration between defaults and custom
+#   set_fact:
+#     thanos_remote_write: "{{ thanos_defaults_remote_write |
+#       combine( thanos_remote_write, recursive=True ) }}"
+#
+# - name: merge thanos remote_read configuration between defaults and custom
+#   set_fact:
+#     thanos_remote_read: "{{ thanos_defaults_remote_read |
+#       combine( thanos_remote_read, recursive=True ) }}"
+#
+# - name: merge thanos storage configuration between defaults and custom
+#   set_fact:
+#     thanos_storage: "{{ thanos_defaults_storage |
+#       combine( thanos_storage, recursive=True ) }}"
+#
+# - name: merge thanos tracing configuration between defaults and custom
+#   set_fact:
+#     thanos_tracing: "{{ thanos_defaults_tracing |
+#       combine( thanos_tracing, recursive=True ) }}"
+#
+# - name: merge thanos rule_files configuration between defaults and custom
+#   set_fact:
+#     thanos_rule_files: "{{ thanos_defaults_rule_files |
+#       union( thanos_rule_files ) }}"
+#
+# - name: merge thanos scrape_configs configuration between defaults and custom
+#   set_fact:
+#     thanos_scrape_configs: "{{ thanos_defaults_scrape_configs |
+#       union( thanos_scrape_configs ) }}"
+#
+# # -----------
+#
+# - name: validate file_sd config in thanos_scrape_configs
+#   set_fact:
+#     missing_target_definition: "{{ thanos_scrape_configs | validate_file_sd(thanos_file_sd_targets) }}"
+#
+# - name: Fail when file_sd targets are not defined in thanos_scrape_configs
+#   fail:
+#     msg: "For the following files a definition in thanos_file_sd_targets is missing:\n
+#       {{ missing_target_definition | join('\n') }}"
+#   when:
+#     - missing_target_definition is defined
+#     - missing_target_definition | count > 0
+
+...

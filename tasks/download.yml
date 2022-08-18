@@ -1,0 +1,37 @@
+---
+
+- block:
+    - name: get checksum list
+      set_fact:
+        # https://github.com/thanos-io/thanos/releases/download/v0.27.0/sha256sums.txt
+        __thanos_checksums: "{{ lookup('url', '{{ thanos_release_download_url }}/download/v' + thanos_version + '/sha256sums.txt', wantlist=True) | list }}"
+      run_once: true
+
+    - name: get checksum for {{ go_arch }} architecture
+      set_fact:
+        __thanos_checksum: "{{ __thanos_checksums | thanos_checksum('linux', go_arch) }}"
+  delegate_to: localhost
+
+- name: download thanos binary archive
+  become: false
+  delegate_to: "{{ thanos_delegate_to }}"
+  get_url:
+    url: "{{ thanos_release_download_url }}/download/v{{ thanos_version }}/thanos-{{ thanos_version }}.linux-amd64.tar.gz"
+    dest: "{{ thanos_local_tmp_directory }}/thanos-linux-amd64.tar.gz"
+    checksum: "sha256:{{ __thanos_checksum }}"
+  register: _download_archive
+  until: _download_archive is succeeded
+  retries: 5
+  delay: 2
+  check_mode: false
+
+- name: extract thanos archive
+  become: false
+  delegate_to: "{{ thanos_delegate_to }}"
+  unarchive:
+    src: "{{ thanos_local_tmp_directory }}/thanos-linux-amd64.tar.gz"
+    dest: "{{ thanos_local_tmp_directory }}"
+    copy: false
+  register: _extract_archive
+
+...

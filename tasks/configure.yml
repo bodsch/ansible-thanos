@@ -1,0 +1,6 @@
+---
+
+- name: restart thanos if needed
+  meta: flush_handlers
+
+...

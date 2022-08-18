@@ -1,0 +1,48 @@
+---
+
+#- name: d
+#  debug:
+#    msg: "{{ service.key }}"
+
+- name: systemd
+  block:
+    - name: "[{{ service.key }}] - redefine service name"
+      set_fact:
+        thanos_service_name: "thanos@{{ service.key }}"
+
+    - name: "[{{ service.key }}] - create systemd service unit"
+      file:
+        state: link
+        src: "{{ systemd_lib_directory }}/thanos@.service"
+        dest: "{{ systemd_lib_directory }}/{{ thanos_service_name }}.service"
+        owner: root
+        group: root
+        mode: 0644
+      notify:
+        - daemon-reload
+
+    - name: "[{{ service.key }}] - create service run configuration"
+      template:
+        src: "default/thanos.{{ service.key }}.j2"
+        dest: "{{ thanos_defaults_directory }}/thanos-{{ service.key }}"
+        force: true
+        owner: root
+        group: "{{ thanos_system_group }}"
+        mode: 0640
+      notify:
+        - restart service
+
+    - name: "[{{ service.key }}] - enable service"
+      service:
+        name: "{{ thanos_service_name }}"
+        state: "{{ service.value.state | default('stopped') }}"
+        enabled: "{{ service.value.enabled | default('false') | bool }}"
+
+  when:
+    - ansible_service_mgr | lower == "systemd"
+    - service.value is defined
+
+- name: flush handlers
+  meta: flush_handlers
+
+...

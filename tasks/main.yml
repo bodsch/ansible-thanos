@@ -1,0 +1,22 @@
+---
+
+- name: prepare
+  include_tasks: prepare.yml
+
+- name: download
+  include_tasks: download.yml
+  when:
+    - not stat_thanos_binary.stat.exists
+
+- name: install
+  include_tasks: install/main.yml
+  #when:
+  #  - not stat_thanos_binary.stat.exists
+
+# - name: configure
+#   include_tasks: configure.yml
+#
+# - name: service
+#   include_tasks: service.yml
+
+...

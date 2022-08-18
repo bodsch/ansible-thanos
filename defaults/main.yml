@@ -1,0 +1,55 @@
+---
+
+thanos_version: 0.27.0
+
+# https://github.com/thanos-io/thanos/releases/download/v0.27.0/thanos-0.27.0.linux-amd64.tar.gz
+thanos_release_download_url: https://github.com/thanos-io/thanos/releases
+
+thanos_system_user: thanos
+thanos_system_group: thanos
+thanos_config_dir: /etc/thanos
+thanos_data_dir: /var/lib/thanos
+
+thanos_enable_experimental: false
+
+thanos_direct_download: false
+
+thanos_services:
+  sidecar:
+    enabled: false
+    state: stopped
+  query:
+    enabled: false
+    state: stopped
+  query_frontend:
+    enabled: false
+    state: stopped
+  store:
+    enabled: false
+    state: stopped
+  compact:
+    enabled: false
+    state: stopped
+  rule:
+    enabled: false
+    state: stopped
+  receive:
+    enabled: false
+    state: stopped
+
+thanos_sidecar: {}
+thanos_query: {}
+thanos_query_frontend: {}
+thanos_store: {}
+thanos_compact: {}
+thanos_rule: {}
+thanos_receive: {}
+
+# Cf. https://thanos.io/tip/thanos/storage.md/
+thanos_objstore_config:
+  type: FILESYSTEM
+  config:
+    directory: "{{ thanos_data_dir }}"
+  prefix: ""
+
+...

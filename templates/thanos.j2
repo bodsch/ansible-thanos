@@ -1,0 +1,9 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+# {{ ansible_managed }}
+
+# GOMAXPROCS={{ ansible_processor_vcpus | default(ansible_processor_count) }}
+
+OPTIONS="
+
+  --config.file={{ thanos_config_dir }}/thanos.yml
+"

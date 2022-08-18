@@ -1,0 +1,135 @@
+---
+
+- name: detect binary file for thanos
+  become: false
+  delegate_to: "{{ thanos_delegate_to }}"
+  stat:
+    path: "{{ thanos_local_tmp_directory }}/thanos-{{ thanos_version }}.linux-amd64/thanos"
+  register: stat_file_binary
+
+- block:
+    - name: propagate thanos binaries
+      copy:
+        src: "{{ thanos_local_tmp_directory }}/thanos-{{ thanos_version }}.linux-amd64/thanos"
+        dest: "{{ thanos_install_path }}/thanos"
+        mode: 0755
+        owner: "{{ thanos_system_user }}"
+        group: "{{ thanos_system_group }}"
+        remote_src: "{{ 'true' if thanos_direct_download else 'false' }}"
+
+    - name: make files executable
+      file:
+        path: "{{ thanos_install_path }}/thanos"
+        mode: 0755
+        owner: "{{ thanos_system_user }}"
+        group: "{{ thanos_system_group }}"
+  when:
+    - stat_file_binary.stat.exists
+
+- name: create local facts
+  template:
+    src: ansible_facts.j2
+    dest: /etc/ansible/facts.d/thanos.fact
+    mode: 0755
+
+- name: create link to binary
+  file:
+    src: "{{ thanos_install_path }}/thanos"
+    dest: "/usr/bin/thanos"
+    state: link
+    force: true
+    follow: false
+  notify:
+    - restart services
+
+- name: create thanos configuration directory
+  file:
+    path: "{{ thanos_config_dir }}"
+    state: directory
+    owner: root
+    group: "{{ thanos_system_group }}"
+    mode: 0770
+
+- name: create thanos data directory
+  file:
+    path: "{{ thanos_data_dir }}"
+    state: directory
+    owner: "{{ thanos_system_user }}"
+    group: "{{ thanos_system_group }}"
+    mode: 0755
+
+- name: configure thanos object storage
+  template:
+    src: thanos/objstore.yml.j2
+    dest: /etc/thanos/objstore.yml
+    owner: "{{ thanos_system_user }}"
+    group: "{{ thanos_system_group }}"
+    mode: '0640'
+
+- name: create systemd service template unit
+  template:
+    src: "init/systemd/thanos.service.j2"
+    dest: "{{ systemd_lib_directory }}/thanos@.service"
+    owner: root
+    group: root
+    mode: 0644
+
+- name: create thanos service units
+  include_tasks: install/services.yml
+  loop:
+    "{{ thanos_services | dict2items }}"
+  loop_control:
+    index_var: index
+    loop_var: service
+    label: "service: {{ service.key }}"
+  when:
+    - thanos_defaults_services is defined
+    - thanos_defaults_services | count > 0
+
+
+
+# - name: openrc
+#   block:
+#     - name: create openrc service configuration
+#       template:
+#         src: "init/openrc/conf.d/thanos.j2"
+#         dest: "/etc/conf.d/thanos"
+#         owner: root
+#         group: root
+#         mode: 0644
+#
+#     - name: create openrc init configuration
+#       template:
+#         src: "init/openrc/init.d/thanos.j2"
+#         dest: "/etc/init.d/thanos"
+#         owner: root
+#         group: root
+#         mode: 0750
+#   when:
+#     - ansible_service_mgr | lower == "openrc"
+
+# - name: create rules directory
+#   file:
+#     state: directory
+#     path: "{{ thanos_config_dir }}/rules"
+#     owner: "{{ thanos_system_user }}"
+#     group: "{{ thanos_system_group }}"
+#     mode: 0750
+#
+# - name: create targets directory
+#   file:
+#     state: directory
+#     path: "{{ thanos_config_dir }}/targets"
+#     owner: "{{ thanos_system_user }}"
+#     group: "{{ thanos_system_group }}"
+#     mode: 0750
+#
+# - name: create file_sd directory
+#   file:
+#     state: directory
+#     path: "{{ thanos_config_dir }}/file_sd"
+#     owner: "{{ thanos_system_user }}"
+#     group: "{{ thanos_system_group }}"
+#     mode: 0750
+
+...

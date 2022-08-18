@@ -1,0 +1,188 @@
+---
+
+thanos_main_version: "{{ thanos_version[0:3] }}"
+
+thanos_install_path: /usr/local/bin/thanos/{{ thanos_version }}
+
+thanos_delegate_to: localhost
+
+thanos_local_tmp_directory: "{{
+  lookup('env', 'CUSTOM_LOCAL_TMP_DIRECTORY') |
+  default(lookup('env', 'HOME') ~ '/.cache/ansible/thanos', true) }}/{{ thanos_version }}"
+
+thanos_requirements:
+  - iproute2
+  - gzip
+
+thanos_defaults_services:
+  sidecar:
+    enabled: false
+    state: stopped
+  query:
+    enabled: false
+  query_frontend:
+    enabled: false
+  store:
+    enabled: false
+  compact:
+    enabled: false
+  rule:
+    enabled: false
+  receive:
+    enabled: false
+
+thanos_defaults_sidecar:
+  pid_file: /run/thanos-sidecar.pid
+  http:
+    listen_port: 19191
+    listen_address: 127.0.0.1
+  grpc:
+    listen_port: 19181
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+  prometheus:
+    url: http://localhost:9090
+  objstore:
+    config_file: /etc/thanos/objstore.yml
+  tsdb:
+    path: /var/lib/prometheus
+
+thanos_defaults_query:
+  pid_file: /run/thanos-query.pid
+  http:
+    listen_port: 19192
+    listen_address: 127.0.0.1
+  grpc:
+    listen_port: 19182
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+  query:
+    replica_label: replica
+
+thanos_defaults_query_frontend:
+  pid_file: /run/thanos-query_frontend.pid
+  http:
+    listen_port: 10902
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+
+thanos_defaults_store:
+  pid_file: /run/thanos-store.pid
+  http:
+    listen_port: 19193
+    listen_address: 127.0.0.1
+  grpc:
+    listen_port: 19183
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+  objstore:
+    config_file: /etc/thanos/objstore.yml
+  data_dir: "{{ thanos_data_dir }}/store"
+
+thanos_defaults_compact:
+  pid_file: /run/thanos-compact.pid
+  http:
+    listen_port: 19194
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+  objstore:
+    config_file: /etc/thanos/objstore.yml
+  data_dir: "{{ thanos_data_dir }}/compact"
+  consistency_delay: "120m"
+  retention:
+    resolution:
+      raw: 30d
+      5m: 180d
+      1h: 7300d
+  wait: true
+
+thanos_defaults_rule:
+  pid_file: /run/thanos-rule.pid
+  http:
+    listen_port: 10902
+    listen_address: 127.0.0.1
+  grpc:
+    listen_port: 10901
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+
+thanos_defaults_receive:
+  pid_file: /run/thanos-receive.pid
+  http:
+    listen_port: 10902
+    listen_address: 127.0.0.1
+  grpc:
+    listen_port: 10901
+    listen_address: 127.0.0.1
+  log:
+    level: info
+    format: json
+
+thanos_defaults_service:
+  log:
+    level: info
+    format: ""
+  # See https://thanos.io/docs/thanos/latest/feature_flags/
+  features: []
+  storage:
+    tsdb:
+      path: /var/lib/thanos
+      retention:
+        time: 15d
+        size: ""
+  web:
+    # [EXPERIMENTAL]
+    # Path to configuration file that can enable TLS or authentication.
+    config:
+      file: ""
+    console:
+      libraries: ""
+      templates: ""
+    cors:
+      origin:
+    enable_lifecycle: false
+    enable_remote_write_receiver: false
+    enable_admin_api: false
+    external_url: ""
+    listen_address: "0.0.0.0:9090"
+    max_connection: ""
+    page_title: ""
+    read_timeout: ""
+    route_prefix: ""
+    user_assets: ""
+  raw_flags: {}
+
+thanos_defaults_global:
+  scrape_interval: 1m
+  scrape_timeout: 10s
+  evaluation_interval: ""
+  external_labels: {}
+  query_log_file: ""
+
+thanos_defaults_directory: /etc/default
+
+thanos_service_name: thanos
+
+go_arch_map:
+  x86_64: 'amd64'
+  aarch64: 'arm64'
+  armv7l: 'armv7'
+  armv6l: 'armv6'
+
+go_arch: "{{ go_arch_map[ansible_architecture] | default(ansible_architecture) }}"
+
+systemd_lib_directory: /lib/systemd/system
+
+...
