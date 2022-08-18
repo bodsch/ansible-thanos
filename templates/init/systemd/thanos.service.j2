@@ -1,22 +1,22 @@
 {{ ansible_managed | comment }}
 
 [Unit]
-Description      = Thanos, %i
+Description      = Thanos, {{ service.key }}
 After            = network-online.target
 
 [Service]
 Type             = simple
-Environment      = "GOMAXPROCS={{ ansible_processor_vcpus | default(ansible_processor_count) }}"
-EnvironmentFile  = {{ thanos_defaults_directory }}/thanos-%i
+# Environment      = "GOMAXPROCS={{ ansible_processor_vcpus | default(ansible_processor_count) }}"
+EnvironmentFile  = {{ thanos_defaults_directory }}/thanos-{{ service.key }}
 
 User             = {{ thanos_system_user }}
 Group            = {{ thanos_system_group }}
 
 ExecReload       = /bin/kill -HUP $MAINPID
-ExecStart        = /usr/bin/thanos %i $OPTIONS
+ExecStart        = /usr/bin/thanos {{ service.key }} $OPTIONS
 
 LimitNOFILE      = 65000
-SyslogIdentifier = thanos-%i
+SyslogIdentifier = thanos-{{ service.key }}
 Restart          = always
 
 [Install]

@@ -6,20 +6,32 @@
 
 - name: systemd
   block:
-    - name: "[{{ service.key }}] - redefine service name"
+    - name: "[{{ service.key }}] - redefine service information"
       set_fact:
-        thanos_service_name: "thanos@{{ service.key }}"
+        thanos_service_name: "thanos-{{ service.key }}"
+        thanos_service_state: "{{ service.value.state | default('stopped') }}"
+        thanos_service_enabled: "{{ service.value.enabled | default('false') | bool }}"
 
     - name: "[{{ service.key }}] - create systemd service unit"
-      file:
-        state: link
-        src: "{{ systemd_lib_directory }}/thanos@.service"
+      template:
+        src: "init/systemd/thanos.service.j2"
         dest: "{{ systemd_lib_directory }}/{{ thanos_service_name }}.service"
         owner: root
         group: root
         mode: 0644
       notify:
         - daemon-reload
+
+    # - name: "[{{ service.key }}] - create systemd service unit"
+    #   file:
+    #     state: link
+    #     src: "{{ systemd_lib_directory }}/thanos@.service"
+    #     dest: "{{ systemd_lib_directory }}/{{ thanos_service_name }}.service"
+    #     owner: root
+    #     group: root
+    #     mode: 0644
+    #   notify:
+    #     - daemon-reload
 
     - name: "[{{ service.key }}] - create service run configuration"
       template:
@@ -30,19 +42,32 @@
         group: "{{ thanos_system_group }}"
         mode: 0640
       notify:
-        - restart service
+        - reload service
+        # - service handler
 
-    - name: "[{{ service.key }}] - enable service"
+    - name: "[{{ service.key }}] - handle service"
       service:
         name: "{{ thanos_service_name }}"
-        state: "{{ service.value.state | default('stopped') }}"
-        enabled: "{{ service.value.enabled | default('false') | bool }}"
+        state: "{{ thanos_service_state }}"
+        enabled: "{{ thanos_service_enabled }}"
+    #   register: _service
 
+    # - name: d
+    #   debug:
+    #     msg: "{{ _service }}"
+
+    # - name: "[{{ service.key }}] - set service state"
+    #   service:
+    #     name: "{{ thanos_service_name }}"
+    #     state: "{{ thanos_service_state }}"
+    #     # enabled: "{{ thanos_service_enabled }}"
+    #   register: _service
+
+    # - name: d
+    #   debug:
+    #     msg: "{{ _service }}"
   when:
     - ansible_service_mgr | lower == "systemd"
     - service.value is defined
-
-- name: flush handlers
-  meta: flush_handlers
 
 ...

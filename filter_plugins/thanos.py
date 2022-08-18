@@ -73,4 +73,3 @@ class FilterModule(object):
         # display.v("= checksum: {}".format(checksum))
 
         return checksum
-

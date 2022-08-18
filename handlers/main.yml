@@ -1,21 +1,5 @@
 ---
 
-# - name: restart services
-#   become: true
-#   service:
-#     name: thanos
-#     state: restarted
-#
-# - name: reload services
-#   become: true
-#   service:
-#     name: thanos
-#     state: reloaded
-#
-# - name: validate config
-#   command: |
-#     /usr/bin/promtool check config {{ thanos_config_dir }}/thanos.yml
-
 - name: restart service (openrc)
   listen: restart service
   service:
@@ -31,6 +15,26 @@
     state: restarted
   when:
     - ansible_service_mgr | lower == 'systemd'
+    - thanos_service_state == 'started'
+    - thanos_service_enabled
+
+- name: reload service (systemd)
+  listen: reload service
+  service:
+    name: "{{ thanos_service_name }}"
+    state: reloaded
+  when:
+    - ansible_service_mgr | lower == 'systemd'
+    - thanos_service_state == 'started'
+    - thanos_service_enabled
+
+- name: service handler
+  listen: service handler
+  service:
+    name: "{{ thanos_service_name }}"
+    state: "{{ thanos_service_state }}"
+    enabled: "{{ thanos_service_enabled }}"
+
 
 - name: daemon-reload
   become: true

@@ -20,16 +20,22 @@ thanos_defaults_services:
     state: stopped
   query:
     enabled: false
+    state: stopped
   query_frontend:
     enabled: false
+    state: stopped
   store:
     enabled: false
+    state: stopped
   compact:
     enabled: false
+    state: stopped
   rule:
     enabled: false
+    state: stopped
   receive:
     enabled: false
+    state: stopped
 
 thanos_defaults_sidecar:
   pid_file: /run/thanos-sidecar.pid
