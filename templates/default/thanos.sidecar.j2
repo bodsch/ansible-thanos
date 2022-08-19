@@ -38,10 +38,13 @@ OPTIONS="
   {# #}
   --objstore.config-file {{ thanos_sidecar.objstore.config_file }} \
   {# #}
+  {% if thanos_sidecar.prometheus is defined and
+        thanos_sidecar.prometheus | default({}) | count > 0 %}
   --prometheus.url {{ thanos_sidecar.prometheus.url }}
-  {% if thanos_sidecar.prometheus.ready_timeout is defined and
-        thanos_sidecar.prometheus.ready_timeout | string | length > 0 %}
+    {% if thanos_sidecar.prometheus.ready_timeout is defined and
+          thanos_sidecar.prometheus.ready_timeout | string | length > 0 %}
   --prometheus.ready_timeout={{ thanos_sidecar.prometheus.ready_timeout }} \
+    {% endif %}
   {% endif %}
   {% if thanos_sidecar.reloader is defined and
         thanos_sidecar.reloader | default({}) | count > 0 %}

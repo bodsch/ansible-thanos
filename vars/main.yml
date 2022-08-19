@@ -50,6 +50,7 @@ thanos_defaults_sidecar:
     format: json
   prometheus:
     url: http://localhost:9090
+    ready_timeout: 10m
   objstore:
     config_file: /etc/thanos/objstore.yml
   tsdb:
@@ -108,9 +109,10 @@ thanos_defaults_compact:
   retention:
     resolution:
       raw: 30d
-      5m: 180d
-      1h: 7300d
+      minutes: 180d
+      hour: 7300d
   wait: true
+  wait_interval: ""
 
 thanos_defaults_rule:
   pid_file: /run/thanos-rule.pid
@@ -135,47 +137,14 @@ thanos_defaults_receive:
   log:
     level: info
     format: json
-
-thanos_defaults_service:
-  log:
-    level: info
-    format: ""
-  # See https://thanos.io/docs/thanos/latest/feature_flags/
-  features: []
-  storage:
-    tsdb:
-      path: /var/lib/thanos
-      retention:
-        time: 15d
-        size: ""
-  web:
-    # [EXPERIMENTAL]
-    # Path to configuration file that can enable TLS or authentication.
-    config:
-      file: ""
-    console:
-      libraries: ""
-      templates: ""
-    cors:
-      origin:
-    enable_lifecycle: false
-    enable_remote_write_receiver: false
-    enable_admin_api: false
-    external_url: ""
-    listen_address: "0.0.0.0:9090"
-    max_connection: ""
-    page_title: ""
-    read_timeout: ""
-    route_prefix: ""
-    user_assets: ""
-  raw_flags: {}
-
-thanos_defaults_global:
-  scrape_interval: 1m
-  scrape_timeout: 10s
-  evaluation_interval: ""
-  external_labels: {}
-  query_log_file: ""
+  objstore:
+    config_file: /etc/thanos/objstore.yml
+  tsdb:
+    overlapping_blocks: true
+    no_lockfile: true
+    path: /var/lib/prometheus
+    retention: 15d
+    wal_compression: true
 
 thanos_defaults_directory: /etc/default
 

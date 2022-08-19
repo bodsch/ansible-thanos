@@ -9,7 +9,63 @@ OPTIONS="
         thanos_compact.log.format in ["logfmt", "json"] %}
   --log.format={{ thanos_compact.log.format }} \
   {% endif %}
+  {# HTTP Endpoint #}
   --http-address {{ thanos_compact.http.listen_address }}:{{ thanos_compact.http.listen_port }} \
+  {% if thanos_compact.http.grace_period is defined %}
+  --http-grace-period={{ thanos_compact.http.grace_period }} \
+  {% endif %}
+  {# #}
+  --objstore.config-file {{ thanos_compact.objstore.config_file }} \
+  {# #}
+  {% if thanos_compact.data_dir is defined and
+        thanos_compact.data_dir | string | length > 0 %}
+  --data-dir="{{ thanos_compact.data_dir }}" \
+  {% endif %}
+  {#
+    Minimum age of fresh (non-compacted) blocks before they are being processed.
+    Malformed blocks older than the maximum of consistency-delay and 48h0m0s will be removed.
+  #}
+  {% if thanos_compact.consistency_delay is defined and
+        thanos_compact.consistency_delay | string | length > 0 %}
+  --consistency-delay={{ thanos_compact.consistency_delay }} \
+  {% endif %}
+  {% if thanos_compact.retention is defined and
+        thanos_compact.retention | default({}) | count > 0 and
+        thanos_compact.retention.resolution is defined and
+        thanos_compact.retention.resolution | default({}) | count > 0 %}
+    {#
+      How long to retain samples of resolution 2 (1 hour) in bucket.
+      Setting this to 0d will retain samples of this resolution forever
+    #}
+    {% if thanos_compact.retention.resolution.hour is defined and
+          thanos_compact.retention.resolution.hour | string | length > 0 %}
+  --retention.resolution-1h={{ thanos_compact.retention.resolution.hour }} \
+    {% endif %}
+    {#
+      How long to retain samples of resolution 1 (5 minutes) in bucket.
+      Setting this to 0d will retain samples of this resolution forever
+    #}
+    {% if thanos_compact.retention.resolution.minutes is defined and
+          thanos_compact.retention.resolution.minutes | string | length > 0 %}
+  --retention.resolution-5m={{ thanos_compact.retention.resolution.minutes }} \
+    {% endif %}
+    {#
+      How long to retain raw samples in bucket.
+      Setting this to 0d will retain samples of this resolution forever
+    #}
+    {% if thanos_compact.retention.resolution.raw is defined and
+          thanos_compact.retention.resolution.raw | string | length > 0 %}
+  --retention.resolution-raw={{ thanos_compact.retention.resolution.raw }} \
+    {% endif %}
+  {% endif %}
+  {% if thanos_compact.wait is defined and
+        thanos_compact.wait %}
+  --wait \
+    {% if thanos_compact.wait_interval is defined and
+          thanos_compact.wait_interval | string | length > 0 %}
+  --wait-interval={{ thanos_compact.wait_interval }} \
+    {% endif %}
+  {% endif %}
 {% endif %}
 "
 

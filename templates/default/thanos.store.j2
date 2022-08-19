@@ -56,7 +56,15 @@ OPTIONS="
         thanos_store.index_cache_size | string | length > 0 %}
   --index-cache-size={{ thanos_store.index_cache_size }} \
   {% endif %}
-
+  {#
+    Local data directory used for caching purposes (index-header, in-mem cache items and meta.jsons).
+    If removed, no data will be lost, just store will have to rebuild the cache.
+    NOTE: Putting raw blocks here will not cause the store to read them. For such use cases use Prometheus + sidecar.
+  #}
+  {% if thanos_store.data_dir is defined and
+        thanos_store.data_dir | string | length > 0 %}
+  --data-dir="{{ thanos_store.data_dir }}" \
+  {% endif %}
 {% endif %}
 "
 

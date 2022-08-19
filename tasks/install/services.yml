@@ -1,9 +1,5 @@
 ---
 
-#- name: d
-#  debug:
-#    msg: "{{ service.key }}"
-
 - name: systemd
   block:
     - name: "[{{ service.key }}] - redefine service information"
@@ -22,17 +18,6 @@
       notify:
         - daemon-reload
 
-    # - name: "[{{ service.key }}] - create systemd service unit"
-    #   file:
-    #     state: link
-    #     src: "{{ systemd_lib_directory }}/thanos@.service"
-    #     dest: "{{ systemd_lib_directory }}/{{ thanos_service_name }}.service"
-    #     owner: root
-    #     group: root
-    #     mode: 0644
-    #   notify:
-    #     - daemon-reload
-
     - name: "[{{ service.key }}] - create service run configuration"
       template:
         src: "default/thanos.{{ service.key }}.j2"
@@ -43,29 +28,13 @@
         mode: 0640
       notify:
         - reload service
-        # - service handler
 
     - name: "[{{ service.key }}] - handle service"
       service:
         name: "{{ thanos_service_name }}"
         state: "{{ thanos_service_state }}"
         enabled: "{{ thanos_service_enabled }}"
-    #   register: _service
 
-    # - name: d
-    #   debug:
-    #     msg: "{{ _service }}"
-
-    # - name: "[{{ service.key }}] - set service state"
-    #   service:
-    #     name: "{{ thanos_service_name }}"
-    #     state: "{{ thanos_service_state }}"
-    #     # enabled: "{{ thanos_service_enabled }}"
-    #   register: _service
-
-    # - name: d
-    #   debug:
-    #     msg: "{{ _service }}"
   when:
     - ansible_service_mgr | lower == "systemd"
     - service.value is defined

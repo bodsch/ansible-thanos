@@ -10,8 +10,138 @@ OPTIONS="
         thanos_receive.log.format in ["logfmt", "json"] %}
   --log.format={{ thanos_receive.log.format }} \
   {% endif %}
+  {# HTTP Endpoint #}
   --http-address {{ thanos_receive.http.listen_address }}:{{ thanos_receive.http.listen_port }} \
-  --grpc-address {{ thanos_receive.grpc.listen_address }}:{{ thanos_receive.grpc.listen_port }}
+  {% if thanos_receive.http.grace_period is defined %}
+  --http-grace-period={{ thanos_receive.http.grace_period }} \
+  {% endif %}
+  {# gRPC endpoint #}
+  --grpc-address {{ thanos_receive.grpc.listen_address }}:{{ thanos_receive.grpc.listen_port }} \
+  {% if thanos_receive.grpc.grace_period is defined and
+        thanos_receive.grpc.grace_period | string | length > 0 %}
+  --grpc-grace-period={{ thanos_receive.grpc.grace_period }} \
+  {% endif %}
+  {% if thanos_receive.grpc.tls is defined and
+        thanos_receive.grpc.tls | default({}) | count > 0 %}
+    {% if thanos_receive.grpc.tls.cert is defined and
+          thanos_receive.grpc.tls.cert | string | length > 0 and
+          thanos_receive.grpc.tls.client_ca is defined and
+          thanos_receive.grpc.tls.client_ca | string | length > 0 and
+          thanos_receive.grpc.tls.key is defined
+          thanos_receive.grpc.tls.key | string | length > 0 %}
+  --grpc-server-tls-cert="{{ thanos_receive.grpc.tls.cert }}" \
+  --grpc-server-tls-client-ca="{{ thanos_receive.grpc.tls.client_ca }}" \
+  --grpc-server-tls-key="{{ thanos_receive.grpc.tls.key }}" \
+    {% endif %}
+  {% endif %}
+  {# #}
+  --objstore.config-file {{ thanos_receive.objstore.config_file }} \
+  {# #}
+  {% if thanos_receive.receive is defined and
+        thanos_receive.receive | default({}) | count > 0 %}
+    {#
+      --receive.default-tenant-id="default-tenant"
+                                 Default tenant ID to use when none is provided via a header.
+      --receive.hashrings=<content>
+                                 Alternative to 'receive.hashrings-file' flag (lower priority). Content of file that contains the hashring configuration.
+      --receive.hashrings-algorithm=hashmod
+                                 The algorithm used when distributing series in the hashrings. Must be one of hashmod, ketama
+      --receive.hashrings-file=<path>
+                                 Path to file that contains the hashring configuration. A watcher is initialized to watch changes and update the hashring dynamically.
+      --receive.hashrings-file-refresh-interval=5m
+                                 Refresh interval to re-read the hashring configuration file. (used as a fallback)
+      --receive.local-endpoint=RECEIVE.LOCAL-ENDPOINT
+                                 Endpoint of local receive node. Used to identify the local node in the hashring configuration. If it's empty AND hashring configuration was provided, it means
+                                 that receive will run in RoutingOnly mode.
+      --receive.relabel-config=<content>
+                                 Alternative to 'receive.relabel-config-file' flag (mutually exclusive). Content of YAML file that contains relabeling configuration.
+      --receive.relabel-config-file=<file-path>
+                                 Path to YAML file that contains relabeling configuration.
+      --receive.replica-header="THANOS-REPLICA"
+                                 HTTP header specifying the replica number of a write request.
+      --receive.replication-factor=1
+                                 How many times to replicate incoming write requests.
+      --receive.tenant-certificate-field=
+                                 Use TLS client's certificate field to determine tenant for write requests. Must be one of organization, organizationalUnit or commonName. This setting will cause
+                                 the receive.tenant-header flag value to be ignored.
+      --receive.tenant-header="THANOS-TENANT"
+                                 HTTP header to determine tenant for write requests.
+      --receive.tenant-label-name="tenant_id"
+                                 Label name through which the tenant will be announced.
+    #}
+  {% endif %}
+  {% if thanos_receive.remote_write is defined and
+        thanos_receive.remote_write | default({}) | count > 0 %}
+    {#
+      --remote-write.address="0.0.0.0:19291"
+                                 Address to listen on for remote write requests.
+      --remote-write.client-server-name=""
+                                 Server name to verify the hostname on the returned TLS certificates. See https://tools.ietf.org/html/rfc4366#section-3.1
+      --remote-write.client-tls-ca=""
+                                 TLS CA Certificates to use to verify servers.
+      --remote-write.client-tls-cert=""
+                                 TLS Certificates to use to identify this client to the server.
+      --remote-write.client-tls-key=""
+                                 TLS Key for the client's certificate.
+      --remote-write.server-tls-cert=""
+                                 TLS Certificate for HTTP server, leave blank to disable TLS.
+      --remote-write.server-tls-client-ca=""
+                                 TLS CA to verify clients against. If no client CA is specified, there is no client verification on server side. (tls.NoClientCert)
+      --remote-write.server-tls-key=""
+                                 TLS Key for the HTTP server, leave blank to disable TLS.
+      --request.logging-config=<content>
+                                 Alternative to 'request.logging-config-file' flag (mutually exclusive). Content of YAML file with request logging configuration. See format details:
+                                 https://thanos.io/tip/thanos/logging.md/#configuration
+    #}
+  {% endif %}
+  {% if thanos_receive.tsdb is defined and
+        thanos_receive.tsdb | default({}) | count > 0 %}
+    {% if thanos_receive.tsdb.overlapping_blocks is defined and
+          thanos_receive.tsdb.overlapping_blocks %}
+    {#
+      Allow overlapping blocks, which in turn enables vertical compaction and vertical query merge.
+    #}
+  --tsdb.allow-overlapping-blocks \
+    {% endif %}
+    {#
+      Enables support for ingesting exemplars and sets the maximum number of exemplars that will be stored per tenant.
+      In case the exemplar storage becomes full (number of stored exemplars becomes equal to max-exemplars),
+      ingesting a new exemplar will evict the oldest exemplar from storage. 0 (or less) value of this flag
+      disables exemplars storage.
+    #}
+    {% if thanos_receive.tsdb.max_exemplars is defined and
+          thanos_receive.tsdb.max_exemplars | string | length > 0 %}
+  --tsdb.max-exemplars=0 \
+    {% endif %}
+    {#
+      Do not create lockfile in TSDB data directory. In any case, the lockfiles will be deleted on next startup.
+    #}
+    {% if thanos_receive.tsdb.no_lockfile is defined and
+          thanos_receive.tsdb.no_lockfile %}
+  --tsdb.no-lockfile \
+    {% endif %}
+    {#
+      Data directory of TSDB.
+    #}
+    {% if thanos_receive.tsdb.path is defined and
+          thanos_receive.tsdb.path | string | length > 0 %}
+  --tsdb.path {{ thanos_receive.tsdb.path }} \
+    {% endif %}
+    {#
+      How long to retain raw samples on local storage. 0d - disables this retention.
+    #}
+    {% if thanos_receive.tsdb.retention is defined and
+          thanos_receive.tsdb.retention | string | length > 0 %}
+  --tsdb.retention={{ thanos_receive.tsdb.retention }} \
+    {% endif %}
+    {#
+      Compress the tsdb WAL.
+    #}
+    {% if thanos_receive.tsdb.wal_compression is defined and
+          thanos_receive.tsdb.wal_compression %}
+  --tsdb.wal-compression \
+    {% endif %}
+  {% endif %}
 {% endif %}
 "
 
