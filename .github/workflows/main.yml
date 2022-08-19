@@ -67,8 +67,7 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - archlinux:latest
-          - artixlinux:latest
+          - debian:11
         ansible-version:
           - '5.1'
           - '6.1'
