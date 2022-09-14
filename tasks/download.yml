@@ -10,11 +10,14 @@
     - name: get checksum for {{ go_arch }} architecture
       set_fact:
         __thanos_checksum: "{{ __thanos_checksums | thanos_checksum('linux', go_arch) }}"
+  become: false
   delegate_to: localhost
+  run_once: true
 
 - name: download thanos binary archive
   become: false
   delegate_to: "{{ thanos_delegate_to }}"
+  run_once: "{{ 'false' if thanos_direct_download else 'true' }}"
   get_url:
     url: "{{ thanos_release_download_url }}/download/v{{ thanos_version }}/thanos-{{ thanos_version }}.linux-amd64.tar.gz"
     dest: "{{ thanos_local_tmp_directory }}/thanos-linux-amd64.tar.gz"
@@ -28,6 +31,7 @@
 - name: extract thanos archive
   become: false
   delegate_to: "{{ thanos_delegate_to }}"
+  run_once: "{{ 'false' if thanos_direct_download else 'true' }}"
   unarchive:
     src: "{{ thanos_local_tmp_directory }}/thanos-linux-amd64.tar.gz"
     dest: "{{ thanos_local_tmp_directory }}"

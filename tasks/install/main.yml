@@ -3,6 +3,7 @@
 - name: detect binary file for thanos
   become: false
   delegate_to: "{{ thanos_delegate_to }}"
+  run_once: "{{ 'false' if thanos_direct_download else 'true' }}"
   stat:
     path: "{{ thanos_local_tmp_directory }}/thanos-{{ thanos_version }}.linux-amd64/thanos"
   register: stat_file_binary
