@@ -1,0 +1,89 @@
+#jinja2: trim_blocks: True, lstrip_blocks: True
+# {{ ansible_managed }}
+
+# GOMAXPROCS={{ ansible_processor_vcpus | default(ansible_processor_count) }}
+
+{% set attr_features = [
+  "expand-external-labels", "remote-write-receiver",
+  "exemplar-storage", "memory-snapshot-on-shutdown",
+  "extra-scrape-metrics", "new-service-discovery-manager",
+  "agent", "promql-per-step-stats",
+  "auto-gomaxprocs" ] %}
+
+command_args="
+{% if thanos_service is defined %}
+  {# log configuration #}
+  --log.level={{ thanos_service.log.level | default('info') }} \
+  {% if thanos_service.log.format is defined and
+        thanos_service.log.format in ["logfmt", "json"] %}
+  --log.format={{thanos_service.log.format }} \
+  {% endif %}
+  {# storage configuration #}
+  {% if thanos_service.storage.tsdb.path is defined %}
+  --storage.tsdb.path={{ thanos_service.storage.tsdb.path }} \
+  {% endif %}
+  {% if thanos_version is version('2.7.0', '>=') %}
+    {% if thanos_service.storage.tsdb.retention.time is defined and
+          thanos_service.storage.tsdb.retention.time | string | length > 0 %}
+  --storage.tsdb.retention.time={{ thanos_service.storage.tsdb.retention.time }} \
+    {% endif %}
+    {% if thanos_service.storage.tsdb.retention.size is defined and
+          thanos_service.storage.tsdb.retention.size | string | length > 0 %}
+  --storage.tsdb.retention.size={{ thanos_service.storage.tsdb.retention.size }} \
+    {% endif %}
+  {% else %}
+    {% if thanos_service.storage.tsdb.retention is defined and
+          not thanos_service.storage.tsdb.retention | type == "dict" %}
+  --storage.tsdb.retention={{ thanos_service.storage.tsdb.retention }} \
+    {% endif %}
+  {% endif %}
+  {% if thanos_version is version('2.24.0', '>=') and
+        thanos_service.web.config.file is defined and
+        thanos_service.web.config.file | string | length > 0 %}
+    --web.config.file={{ thanos_config_dir }}/{{ thanos_service.web.config.file | default('web.yml') }} \
+  {% endif %}
+  {# web configuration #}
+  --web.console.libraries={{ thanos_config_dir }}/console_libraries \
+  --web.console.templates={{ thanos_config_dir }}/consoles \
+  {% if thanos_service.web.listen_address is defined and
+        thanos_service.web.listen_address | string | length > 0 %}
+  --web.listen-address={{ thanos_service.web.listen_address }} \
+  {% endif %}
+  {% if thanos_service.web.external_url is defined and
+        thanos_service.web.external_url | string | length > 0 %}
+  --web.external-url={{ thanos_service.web.external_url }} \
+  {% endif %}
+  {% if thanos_service.web.enable_admin_api is defined and
+        thanos_service.web.enable_admin_api %}
+  --web.enable-admin-api \
+  {# feature configuration #}
+  {% endif %}
+  {% if thanos_service.features is defined and
+        thanos_service.features | type == "list" and
+        thanos_service.features | count > 0 and
+        thanos_service.features in attr_features %}
+  --enable-feature={{ thanos_service.features | join(', ') }}
+  {% endif %}
+  {% if thanos_service.raw_flags is defined %}
+    {% for flag, flag_value in thanos_service.raw_flags.items() %}
+      {% if not flag_value %}
+  --{{ flag }} \
+      {% elif flag_value is string %}
+  --{{ flag }}={{ flag_value }} \
+      {% elif flag_value is sequence %}
+        {% for flag_value_item in flag_value %}
+  --{{ flag }}={{ flag_value_item }} \
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
+  --config.file={{ thanos_config_dir }}/thanos.yml
+"
+
+# command_args="
+#   --config.file=/etc/thanos/thanos.yml
+#   --storage.tsdb.retention.time=365d
+#   --storage.tsdb.path=/var/lib/thanos/data
+#   --web.listen-address="0.0.0.0:9090"
+#   --web.enable-admin-api"
